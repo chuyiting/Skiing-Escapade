@@ -9,6 +9,11 @@ public class StartButton : MonoBehaviour
     public SetUp setup;
     private Button btn;
 
+    private void Awake() 
+    {
+        btn = GetComponent<Button>();
+    }
+
     // Update is called once per frame
     void Update()
     {

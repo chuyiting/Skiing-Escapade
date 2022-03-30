@@ -12,15 +12,15 @@ public class PlayerControl : MonoBehaviour
     public float airDensity = 1.225f; // kg / m^3
     public float fullFrontalArea = 0.8f; // m^2
     public float currFrontalArea = 0.0f;
-    public float sensitivity = 0.1f;
+    public float sensitivity = 0.01f;
     public float maxSpeed = 3.0f;
     public float poleAcceleration = 3.0f;
     public SteamVR_Action_Boolean moveAction;
     public SteamVR_Action_Boolean resetStance;
     public LayerMask terrainLayer;
-    public SetUp setup;
 
     // For Ski
+    public float mass = 1.0f;
     public float skiForceMagnitude = 100f; 
     public float skiUniDisplacementPerFrame = 0.1f;
     
@@ -36,14 +36,21 @@ public class PlayerControl : MonoBehaviour
     public SteamVR_Input_Sources body;
     public SteamVR_Input_Sources leftController;
 
-    private Vector3 normal = Vector3.zero;
+    public Vector3 normal = Vector3.zero;
 
-    private bool poleTrigger = false;
-    private Rigidbody rb;
 
     public Vector3 skiForce;
 
-    private bool start = false;
+    // for start
+    public bool start = false;
+    public Skis skis;
+
+    // ski pole 
+    public float skiPoleSpeed = 20.0f;
+    private bool skiPolePushed = false;
+
+    // sound
+    private AudioSource audioSource;
 
 
 
@@ -51,11 +58,10 @@ public class PlayerControl : MonoBehaviour
     private void Awake() 
     {
         prevPosition = transform.position;
-        rb = GetComponent<Rigidbody>();
-        setup = GetComponent<SetUp>();
-        GameObject skis = GameObject.Find("skies");
-        rb.centerOfMass = new Vector3(0.0f, 0.0f, 0.0f);
+        skis = GameObject.Find("skis").GetComponent<Skis>();
         skiForce = Vector3.zero;
+
+        audioSource = GetComponent<AudioSource>();
     }
 
     private void Start() 
@@ -70,13 +76,18 @@ public class PlayerControl : MonoBehaviour
     {
         if (resetStance.stateDown) ResetStance();
         if (moveAction.stateDown) {
-            hapticMotion.Execute(0, 1f, 1f, 1, leftController);
+            Debug.Log("STARTTTTT");
+            // hapticMotion.Execute(0, 1f, 1f, 1, leftController);
+            if (skis != null) 
+            {
+                skis.ResetSkiPosition();
+            }
             start = true;
         }
 
         if (!start) return;
-        CalculateSpeed();
         MoveCharacter();
+        CalculateSpeed();
         //balance();
 
 
@@ -110,12 +121,6 @@ public class PlayerControl : MonoBehaviour
 
     }
 
-    private void OnTriggerEnter(Collider other) {
-        if (!moveAction.state) return;
-        if (other.gameObject.tag != "terrain") return;
-        Debug.Log("Move");
-        poleTrigger = true;
-    }
 
     // make sure camera does not follow the rotation of the headset 
     private void HandleHead()
@@ -155,12 +160,27 @@ public class PlayerControl : MonoBehaviour
 
     private void CalculateSpeed()
     {
-        speed = (transform.position - prevPosition) / Time.deltaTime;
+        speed = (transform.position - prevPosition) / Time.fixedDeltaTime;
         if (float.IsNaN(speed.x) || float.IsNaN(speed.y) || float.IsNaN(speed.z))
         {
             speed = Vector3.zero;
         }
         prevPosition = transform.position;
+
+        if (speed.magnitude > maxSpeed)
+        {
+            speed = speed.normalized * maxSpeed;
+        }
+
+        if (speed.magnitude > 0.5f && !audioSource.isPlaying) 
+        {
+            audioSource.Play();
+        } 
+
+        if (speed.magnitude <= 0.5f && audioSource.isPlaying) 
+        {
+            audioSource.Stop();
+        }
     }
 
 
@@ -170,18 +190,13 @@ public class PlayerControl : MonoBehaviour
             // gravity
             Vector3 velocity = speed;
 
-            // pole force
-            if (poleTrigger)
-            {
-                velocity += transform.forward.normalized * poleAcceleration * Time.deltaTime;
-                poleTrigger = false;
-            }
-
-            velocity = ApplyGravity(speed);
+            //velocity = ApplyGravity(speed);
             velocity = AdjustVelocityToSlope(velocity);
+            velocity = ApplySkiPoleForce(velocity);
             velocity = ApplyFriction(velocity, normal);
+
             velocity = ApplyDragForce(velocity);
-            velocity = ApplySkiForce(velocity);
+            //velocity = ApplySkiForce(velocity);
             //Debug.Log("velocity after: " + velocity);
 
             if (float.IsNaN(velocity.x) || float.IsNaN(velocity.y) || float.IsNaN(velocity.z)) velocity = Vector3.zero;
@@ -202,10 +217,14 @@ public class PlayerControl : MonoBehaviour
 
     private Vector3 ApplyFriction(Vector3 slopeSpeed, Vector3 normal)
     {
-        float frictionalForce = frictionCoefficient * Vector3.Project(rb.mass * Physics.gravity, normal).magnitude; // miu * m * g * cos
-        if (frictionalForce == float.NaN) frictionalForce = 0.0f;
-        float acceleration = frictionalForce / rb.mass;
-        float changeOfSpeed = acceleration * Time.deltaTime;
+
+        float frictionalForce = frictionCoefficient * Vector3.Project(mass * Physics.gravity, normal).magnitude; // miu * m * g * cos
+        if (frictionalForce == float.NaN) {
+            frictionalForce = 0.0f;
+        }
+
+        float acceleration = frictionalForce / mass;
+        float changeOfSpeed = acceleration * sensitivity;
         
         if (changeOfSpeed >= slopeSpeed.magnitude) return Vector3.zero;
         return slopeSpeed - slopeSpeed.normalized * changeOfSpeed;
@@ -216,9 +235,9 @@ public class PlayerControl : MonoBehaviour
         float threshold = 1.0f; // when the speed is too low, ignore drag force
         if (slopeSpeed.magnitude < threshold) return slopeSpeed;
 
-        currFrontalArea = head.localPosition.y / setup.HEIGHT * fullFrontalArea;
+        currFrontalArea = head.localPosition.y / SetUp.HEIGHT * fullFrontalArea;
         float dragForce = dragCoefficient *  1.0f / 2.0f * airDensity * currFrontalArea * slopeSpeed.magnitude * slopeSpeed.magnitude; // 1/2 * rho * A * v^2
-        float acceleration = dragForce / rb.mass;
+        float acceleration = dragForce / mass;
         float changeOfSpeed = acceleration * Time.deltaTime;
 
         if (changeOfSpeed >= slopeSpeed.magnitude) return Vector3.zero;
@@ -232,11 +251,27 @@ public class PlayerControl : MonoBehaviour
         tanSkiForce = tanSkiForce - Vector3.Project(tanSkiForce, normal);
 
         Debug.Log("tan ski force: " + tanSkiForce);
-        Vector3 acceleration = tanSkiForce / rb.mass; // opposite force
+        Vector3 acceleration = tanSkiForce / mass; // opposite force
         Vector3 changeOfSpeed = acceleration * Time.deltaTime;
         Debug.Log("change of speed: " + changeOfSpeed);
 
         return slopeSpeed + changeOfSpeed;
+    }
+
+    private Vector3 ApplySkiPoleForce(Vector3 slopeSpeed) {
+        if (!skiPolePushed) return slopeSpeed;
+
+        if (slopeSpeed.magnitude > maxSpeed)
+        {
+            return slopeSpeed;
+        }
+
+        Debug.Log("NOW apply ski pole force NOW!!!");
+        Vector3 forceDir = (skis.transform.forward - Vector3.Project(skis.transform.forward, normal)).normalized;
+        Debug.Log("push speed: " + skiPoleSpeed * forceDir * sensitivity);
+
+        skiPolePushed = false;
+        return slopeSpeed + skiPoleSpeed * forceDir * sensitivity;
     }
 
     public void SetSkiForce(Vector3 controllerDisplacement)
@@ -245,7 +280,6 @@ public class PlayerControl : MonoBehaviour
         float ratio = magnitude / skiUniDisplacementPerFrame;
         Quaternion rotation = Quaternion.FromToRotation(Vector3.up, normal);
         skiForce = rotation * controllerDisplacement.normalized * skiForceMagnitude * ratio;
-        //Debug.Log("ski force: " + skiForce);
     }
 
     public void ResetStance()
@@ -254,7 +288,14 @@ public class PlayerControl : MonoBehaviour
         start = false;
         transform.up = Vector3.up;
         transform.position = new Vector3(transform.position.x, transform.position.y + 0.25f, transform.position.z);
+        skis.ResetSkiPosition();
 
+    }
+
+    public void ExertSkiPoleForce()
+    {
+        Debug.Log("exert ski pole force");
+        skiPolePushed = true;
     }
 
 }

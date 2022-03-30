@@ -6,8 +6,7 @@ using TMPro;
 
 public class SetUp : MonoBehaviour
 {
-    public SteamVR_Action_Boolean setUpAction;
-    public float HEIGHT = 2.0f;
+    public static float HEIGHT = 2.0f;
     public TextMeshProUGUI heightText;
     public TextMeshProUGUI calibrateText;
     private bool startCalibrate = false;
@@ -26,31 +25,36 @@ public class SetUp : MonoBehaviour
     void Update()
     {
         if (!startCalibrate) return;
-        heightSet = false;
-        
+
         if (heightText.gameObject.activeSelf && !heightSet) 
         {
             heightText.text = head.localPosition.y.ToString("0.00");
+            heightText.color = Color.white;
         }
 
-        if (gameObject.activeSelf && setUpAction.stateDown && !heightSet)
+        Debug.Log("height set: " + heightSet);
+        if (heightText.gameObject.activeSelf && heightSet)
         {
             HEIGHT = head.localPosition.y;
             heightText.color = Color.yellow;
-            heightSet = true;
         }
     }
 
     public void Calibrate() 
     {
+        // finish calibrate
         if (startCalibrate)
         {
             calibrateText.text = "Calibrate";
             startCalibrate = false;
-        } else 
+            heightSet = true;
+        } 
+        // start to calibrate
+        else 
         {
             calibrateText.text = "Done";
             startCalibrate = true;
+            heightSet = false;
         }
     }
 

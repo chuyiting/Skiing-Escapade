@@ -26,7 +26,6 @@ public class Ski : MonoBehaviour
         // for ski
         hasSkiStarted = false;
         pose.AddOnUpdateListener(hand, DoSki);
-        //pose.AddOnUpdateListener(head, MoveSkiBasedOnHead);
         headTransform = SteamVR_Render.Top().head;
 
     }
@@ -34,16 +33,8 @@ public class Ski : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        RotateSki();
     }
 
-    void MoveSkiBasedOnHead(SteamVR_Action_Pose fromAction, SteamVR_Input_Sources fromSource)
-    {
-        Vector3 displacement = fromAction.localPosition - fromAction.lastLocalPosition;
-        displacement -= Vector3.Project(displacement, transform.up); // cancel out local y directional movement
-        transform.position += displacement;
-        transform.parent.position += displacement;
-    }
 
     void RotateSki()
     {
@@ -55,7 +46,7 @@ public class Ski : MonoBehaviour
 
     void DoSki(SteamVR_Action_Pose fromAction, SteamVR_Input_Sources fromSource)
     {
-        makeSkiFollowController(fromAction);
+        //makeSkiFollowController(fromAction);
         if (skiMovement.state)
         {
             Debug.Log("controller velocity: " + fromAction.velocity);
