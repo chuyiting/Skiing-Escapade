@@ -14,9 +14,12 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Player.unity
     guid: 74970c32493952246b012163ba48250e
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/SnowMountains.unity
     guid: 80a7b5808b43ae245bc2c97ce3cfc017
+  - enabled: 1
+    path: Assets/Scenes/Snow.unity
+    guid: d2f17229c403a4972bdb9ab4464d6576
   m_configObjects:
     Unity.XR.OpenVR.Settings: {fileID: 11400000, guid: 8100d225d39482f43ac977aed96e9f41, type: 2}
     Unity.XR.WindowsMR.Settings: {fileID: 11400000, guid: 18a3e48e2754e0a4883372a725087d4f, type: 2}

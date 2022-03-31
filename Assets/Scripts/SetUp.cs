@@ -6,7 +6,7 @@ using TMPro;
 
 public class SetUp : MonoBehaviour
 {
-    public static float HEIGHT = 2.0f;
+    public static float HEIGHT = 1.75f;
     public TextMeshProUGUI heightText;
     public TextMeshProUGUI calibrateText;
     private bool startCalibrate = false;

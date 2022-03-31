@@ -43,15 +43,20 @@ public class PlayerControl : MonoBehaviour
 
     // for start
     public bool start = false;
-    public Skis skis;
+    private Skis skis;
 
     // ski pole 
     public float skiPoleSpeed = 20.0f;
     private bool skiPolePushed = false;
 
     // sound
-    private AudioSource audioSource;
+    public AudioSource skiBackgroundAudio;
+    public AudioSource skiPushAudio;
 
+
+    // movement
+    public float gravityAngle = 40.0f;
+    private CharacterController characterController;
 
 
     public bool testBody = false;
@@ -60,8 +65,8 @@ public class PlayerControl : MonoBehaviour
         prevPosition = transform.position;
         skis = GameObject.Find("skis").GetComponent<Skis>();
         skiForce = Vector3.zero;
-
-        audioSource = GetComponent<AudioSource>();
+        
+        characterController = GetComponent<CharacterController>();
     }
 
     private void Start() 
@@ -146,13 +151,18 @@ public class PlayerControl : MonoBehaviour
     {
         var ray = new Ray(transform.position, Vector3.down);
 
-        if (Physics.Raycast(ray, out RaycastHit hitInfo, 0.5f)) 
+        if (Physics.Raycast(ray, out RaycastHit hitInfo, 10.0f, terrainLayer)) 
         {
             Debug.DrawLine(hitInfo.normal + hitInfo.point, hitInfo.point, Color.green);
             normal = hitInfo.normal;
+            Debug.Log("normal: " + normal);
             Vector3 slopeVector = velocity - Vector3.Project(velocity, hitInfo.normal.normalized);
             return slopeVector;
 
+        }
+        else 
+        {
+            Debug.Log("no normal detected");
         }
         return velocity;
     }
@@ -172,14 +182,14 @@ public class PlayerControl : MonoBehaviour
             speed = speed.normalized * maxSpeed;
         }
 
-        if (speed.magnitude > 0.5f && !audioSource.isPlaying) 
+        if (speed.magnitude > 0.5f && !skiBackgroundAudio.isPlaying) 
         {
-            audioSource.Play();
+            skiBackgroundAudio.Play();
         } 
 
-        if (speed.magnitude <= 0.5f && audioSource.isPlaying) 
+        if (speed.magnitude <= 0.5f && skiBackgroundAudio.isPlaying) 
         {
-            audioSource.Stop();
+            skiBackgroundAudio.Stop();
         }
     }
 
@@ -187,32 +197,55 @@ public class PlayerControl : MonoBehaviour
 
     private void MoveCharacter()
     {
-            // gravity
-            Vector3 velocity = speed;
+        // cancel out y directional speed if the character is grounded
+        if (characterController.isGrounded)
+        {
+            speed.y = 0.0f;
+        }
 
-            //velocity = ApplyGravity(speed);
+        // gravity
+        Vector3 velocity = speed;
+
+        velocity = AdjustVelocityToSlope(velocity);
+        velocity = ApplyGravity(speed);
+
+        if (!characterController.isGrounded)
+        {
+            Debug.Log("should not reach here");
             velocity = AdjustVelocityToSlope(velocity);
-            velocity = ApplySkiPoleForce(velocity);
-            velocity = ApplyFriction(velocity, normal);
+        }
+        velocity = ApplySkiPoleForce(velocity);
+        velocity = ApplyFriction(velocity, normal);
 
-            velocity = ApplyDragForce(velocity);
-            //velocity = ApplySkiForce(velocity);
-            //Debug.Log("velocity after: " + velocity);
+        velocity = ApplyDragForce(velocity);
+        //velocity = ApplySkiForce(velocity);
+        //Debug.Log("velocity after: " + velocity);
 
-            if (float.IsNaN(velocity.x) || float.IsNaN(velocity.y) || float.IsNaN(velocity.z)) velocity = Vector3.zero;
+        if (float.IsNaN(velocity.x) || float.IsNaN(velocity.y) || float.IsNaN(velocity.z)) velocity = Vector3.zero;
 
-            //projVelocity = projVelocity.magnitude > maxSpeed ? projVelocity.normalized * maxSpeed : projVelocity;
+        //projVelocity = projVelocity.magnitude > maxSpeed ? projVelocity.normalized * maxSpeed : projVelocity;
 
-            Debug.DrawLine(transform.position, transform.position + (velocity * 5), Color.red);
+        Debug.DrawLine(transform.position, transform.position + (velocity * 5), Color.red);
 
-            if (velocity.magnitude < 1.0f) velocity = Vector3.zero;
-            
-            transform.position = transform.position + velocity * Time.deltaTime;
+        if (velocity.magnitude < 1.0f) velocity = Vector3.zero;
+        
+        characterController.Move(velocity * Time.deltaTime);
+        //transform.position = transform.position + velocity * Time.deltaTime;
     }
 
     private Vector3 ApplyGravity(Vector3 speed)
     {
-        return speed + (Physics.gravity * Time.deltaTime);
+        if (Vector3.Dot(normal.normalized, Vector3.up.normalized) > Mathf.Cos(gravityAngle / 180.0f * Mathf.PI))
+        {
+            return speed + (Physics.gravity * Time.deltaTime);
+        } 
+
+        if (!characterController.isGrounded) 
+        {
+            return speed + (Physics.gravity * Time.deltaTime);
+        }
+
+        return speed;
     }
 
     private Vector3 ApplyFriction(Vector3 slopeSpeed, Vector3 normal)
@@ -260,18 +293,24 @@ public class PlayerControl : MonoBehaviour
 
     private Vector3 ApplySkiPoleForce(Vector3 slopeSpeed) {
         if (!skiPolePushed) return slopeSpeed;
+        skiPolePushed = false;
 
-        if (slopeSpeed.magnitude > maxSpeed)
-        {
-            return slopeSpeed;
-        }
+        if (skiPushAudio.isPlaying) return slopeSpeed;
 
         Debug.Log("NOW apply ski pole force NOW!!!");
-        Vector3 forceDir = (skis.transform.forward - Vector3.Project(skis.transform.forward, normal)).normalized;
+        skiPushAudio.Play();
+        //Vector3 forceDir = (skis.transform.forward - Vector3.Project(skis.transform.forward, normal)).normalized;
+        Vector3 forceDir = (skis.transform.forward - Vector3.Project(skis.transform.forward, Vector3.up)).normalized;
         Debug.Log("push speed: " + skiPoleSpeed * forceDir * sensitivity);
 
-        skiPolePushed = false;
-        return slopeSpeed + skiPoleSpeed * forceDir * sensitivity;
+        Vector3 newSpeed = slopeSpeed + skiPoleSpeed * forceDir * sensitivity;
+
+        if (newSpeed.magnitude > maxSpeed) 
+        {
+            newSpeed = newSpeed.normalized * maxSpeed;
+        }
+
+        return newSpeed;
     }
 
     public void SetSkiForce(Vector3 controllerDisplacement)

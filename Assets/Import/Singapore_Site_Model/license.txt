@@ -1,0 +1,11 @@
+Model Information:
+* title:	Singapore Site Model
+* source:	https://sketchfab.com/3d-models/singapore-site-model-2bfd542c7f7949e28a6fa58a826ed8f1
+* author:	Vipin (https://sketchfab.com/vpin)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Singapore Site Model" (https://sketchfab.com/3d-models/singapore-site-model-2bfd542c7f7949e28a6fa58a826ed8f1) by Vipin (https://sketchfab.com/vpin) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

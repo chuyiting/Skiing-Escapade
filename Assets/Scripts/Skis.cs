@@ -6,7 +6,8 @@ public class Skis : MonoBehaviour
 {
     public Transform followHead;
     private PlayerControl playerControl;
-
+    public LayerMask terrainLayer;
+    
     private void Awake() {
         playerControl = GameObject.Find("Player").GetComponent<PlayerControl>();
     }
@@ -18,6 +19,8 @@ public class Skis : MonoBehaviour
     private void Update() {
         if (playerControl.start)
         {
+            var ray = new Ray(transform.position, Vector3.down);
+
             Vector3 forward = followHead.forward - Vector3.Project(followHead.forward, playerControl.normal);
             transform.forward = forward;
         }
