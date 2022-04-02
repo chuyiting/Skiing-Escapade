@@ -10,7 +10,7 @@ public class Pointer : MonoBehaviour
     public GameObject hand;
 
     public float defaultLength = 0.5f;
-     public VRInputModule inputModule;
+    public VRInputModule inputModule;
 
     private LineRenderer lineRenderer;
     private void Awake()

@@ -14,30 +14,33 @@ namespace Valve.VR.InteractionSystem
 	public class BodyCollider : MonoBehaviour
 	{
 		public Transform head;
+		public static bool isGrounded = false;
 
 		private CapsuleCollider capsuleCollider;
+		public LayerMask terrainLayerMask;
 
 		//-------------------------------------------------
 		void Awake()
 		{
 			capsuleCollider = GetComponent<CapsuleCollider>();
+			Debug.Log("isgrounded: " + isGrounded);
 		}
 
 
 		//-------------------------------------------------
 		void FixedUpdate()
 		{
-			// float distanceFromFloor = Vector3.Dot( head.localPosition, Vector3.up );
-			// capsuleCollider.height = Mathf.Max( capsuleCollider.radius, distanceFromFloor );
-			// transform.localPosition = head.localPosition - 0.5f * distanceFromFloor * Vector3.up;
 		}
 
 		private void OnTriggerEnter(Collider other) {
-			Debug.Log("trigger enter: " + other.tag);
+			Debug.Log("trigger tag: " + other.tag );
+			isGrounded = other != null && (((1 << other.gameObject.layer) & terrainLayerMask) != 0);
+			Debug.Log("isgrounded: " + isGrounded);
 		}
 
 		private void OnTriggerExit(Collider other) {
-			Debug.Log("trigger exit: " + other.tag);
+			isGrounded = false;
+			Debug.Log("isgrounded: " + isGrounded);
 		}
 	}
 }

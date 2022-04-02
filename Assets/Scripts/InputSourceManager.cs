@@ -5,6 +5,18 @@ using Valve.VR;
 
 public class InputSourceManager : MonoBehaviour
 {
+    private static InputSourceManager instance;
+    public static InputSourceManager Instance 
+    {
+        get {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<InputSourceManager>();
+            }
+            return instance;
+        }
+    }
+
     public enum Scene {
         HOMEPAGE, GAME
     }
@@ -25,4 +37,15 @@ public class InputSourceManager : MonoBehaviour
 
         }
     }
+
+    public void TurnOnUIActionSet()
+    {
+        HomepageActionSet.Activate();
+    }
+
+    public void TurnOnGameActionSet()
+    {
+        GameActionSet.Activate();
+    }
 }
+
