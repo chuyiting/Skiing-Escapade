@@ -14,6 +14,7 @@ public class PlayerControl : MonoBehaviour
     public float currFrontalArea = 0.0f;
     public float sensitivity = 0.01f;
     public float maxSpeed = 3.0f;
+    public float maxSpeedGondola = 5.0f;
     public float poleAcceleration = 3.0f;
     public SteamVR_Action_Boolean moveAction;
     public SteamVR_Action_Boolean resetStance;
@@ -61,12 +62,16 @@ public class PlayerControl : MonoBehaviour
 
     // brake
     private bool brake = false;
-    public float breakAmountPerFrame = 0.5f;
+    public float brakeAmountPerFrame = 0.5f;
 
     // animation
     public GameObject snowfog1;
     public GameObject snowfog2;
 
+    // gondola movement
+    public SteamVR_Action_Boolean jump;
+    private bool isInGondola = false;
+    public static bool inGondolaRange = false;
 
     public bool testBody = false;
     private void Awake() 
@@ -89,10 +94,9 @@ public class PlayerControl : MonoBehaviour
     }
 
     private void Update() 
-    {
+    {   
         if (resetStance.stateDown) ResetStance();
         if (moveAction.stateDown) {
-            Debug.Log("STARTTTTT");
             // hapticMotion.Execute(0, 1f, 1f, 1, leftController);
             if (skis != null) 
             {
@@ -102,20 +106,43 @@ public class PlayerControl : MonoBehaviour
         }
 
         if (!start) return;
+
+        // if attached to gondola, disable character controller
+        if (transform.parent != null && characterController.enabled) 
+        {
+            characterController.enabled = false;
+        }
+        else if (transform.parent == null && !characterController.enabled)
+        {
+            characterController.enabled = true;
+        }
+
         MoveCharacter();
         CalculateSpeed();
-        //balance();
-
-
-        // HandleHead();
-        // CalculateMovement();
-        // HandleHeight();
     }
 
     void BodyTest(SteamVR_Action_Pose fromAction, SteamVR_Input_Sources fromSource)
     {
     }
 
+    private Vector3 ApplyGondolaMotion(Vector3 speed)
+    {
+        if (jump.stateDown)
+        {  
+            speed = speed + Vector3.up * maxSpeed + head.transform.forward * maxSpeed;
+        }
+
+        if (speed.magnitude > maxSpeedGondola) 
+        {
+            speed = speed.normalized * maxSpeedGondola;
+        }
+        return speed;
+    } 
+
+    public void ToggleGondolaMode(bool inGondola)
+    {
+        isInGondola = inGondola;
+    }
 
 
     private void balance() 
@@ -123,7 +150,7 @@ public class PlayerControl : MonoBehaviour
    
         float threshold = 0.866f;
 
-         RaycastHit contact;
+        RaycastHit contact;
         // Does the ray intersect any objects excluding the player layer
         if (Physics.Raycast(transform.position, transform.TransformDirection(Vector3.down), out contact, 3.0f, terrainLayerMask))
         {
@@ -192,6 +219,14 @@ public class PlayerControl : MonoBehaviour
             speed = planarSpeed.normalized * maxSpeed + new Vector3(0.0f, speed.y, 0.0f);
         }
 
+        if (isInGondola)
+        {
+            skiBackgroundAudio.Stop();
+            snowfog1.SetActive(false);
+            snowfog2.SetActive(false);
+            return;
+        }
+
         if (speed.magnitude > 0.5f && !skiBackgroundAudio.isPlaying && GroundCheck.isGrounded) 
         {
             skiBackgroundAudio.Play();
@@ -243,16 +278,19 @@ public class PlayerControl : MonoBehaviour
 
         // velocity = ApplyDragForce(velocity);
         // Debug.Log("speed after drag force: " + velocity);
-        //velocity = ApplySkiForce(velocity);
-        //Debug.Log("velocity after: " + velocity);
+
+        // must apply last
+        if (inGondolaRange)
+        {
+            velocity = ApplyGondolaMotion(velocity);
+        }
 
         if (float.IsNaN(velocity.x) || float.IsNaN(velocity.y) || float.IsNaN(velocity.z)) velocity = Vector3.zero;
 
-        //projVelocity = projVelocity.magnitude > maxSpeed ? projVelocity.normalized * maxSpeed : projVelocity;
 
         Debug.DrawLine(transform.position, transform.position + (velocity * 5), Color.red);
+
         characterController.Move(velocity * Time.deltaTime);
-        //transform.position = transform.position + velocity * Time.deltaTime;
     }
 
     private Vector3 ApplyGravity(Vector3 speed)
@@ -260,22 +298,17 @@ public class PlayerControl : MonoBehaviour
         if (Vector3.Dot(normal.normalized, Vector3.up.normalized) < Mathf.Cos(gravityAngle / 180.0f * Mathf.PI))
         {
             Vector3 slopeDirGravity = Vector3.down - Vector3.Project(Vector3.down, normal);
-            Debug.Log("slope direction gravity: " + slopeDirGravity);
-            Debug.Log("transform.forward: " + transform.forward);
             if (Vector3.Dot(slopeDirGravity, transform.forward) < 0) 
             {
-                Debug.Log("avoid pushing");
                 return speed;
             }
 
             Vector3 newSpeeed = speed + (Physics.gravity * Time.deltaTime);
-            Debug.Log("apply gravity: slope too steep");
             return newSpeeed;
         } 
 
         if (!GroundCheck.isGrounded) 
         {
-            Debug.Log("apply gravity: not grounded");
             return speed + (Physics.gravity * Time.deltaTime);
         }
 
@@ -314,19 +347,6 @@ public class PlayerControl : MonoBehaviour
         return speed - slopeSpeed * changeOfSpeed;
     }
 
-    private Vector3 ApplySkiForce(Vector3 slopeSpeed)
-    {
-        //Quaternion rotation = Quaternion.FromToRotation(Vector3.up, normal);
-        Vector3 tanSkiForce = skiForce;
-        tanSkiForce = tanSkiForce - Vector3.Project(tanSkiForce, normal);
-
-        Debug.Log("tan ski force: " + tanSkiForce);
-        Vector3 acceleration = tanSkiForce / mass; // opposite force
-        Vector3 changeOfSpeed = acceleration * Time.deltaTime;
-        Debug.Log("change of speed: " + changeOfSpeed);
-
-        return slopeSpeed + changeOfSpeed;
-    }
 
     private Vector3 ApplySkiPoleForce(Vector3 slopeSpeed) {
         if (!skiPolePushed) return slopeSpeed;
@@ -334,9 +354,11 @@ public class PlayerControl : MonoBehaviour
 
         if (skiPushAudio.isPlaying) return slopeSpeed;
 
-        Debug.Log("NOW apply ski pole force NOW!!!");
-        skiPushAudio.Play();
-        //Vector3 forceDir = (skis.transform.forward - Vector3.Project(skis.transform.forward, normal)).normalized;
+        if (!isInGondola) 
+        {
+           skiPushAudio.Play(); 
+        }
+
         Vector3 forceDir = (skis.transform.forward - Vector3.Project(skis.transform.forward, Vector3.up)).normalized;
         Debug.Log("push speed: " + skiPoleSpeed * forceDir * sensitivity);
 
@@ -400,9 +422,13 @@ public class PlayerControl : MonoBehaviour
     {
         if (!brake) return speed;
 
-        Debug.Log("brake");
-        if (breakAmountPerFrame >= speed.magnitude) return Vector3.zero;
-        speed -= speed.normalized * breakAmountPerFrame;
+        float brakeAmount = brakeAmountPerFrame;
+        if (isInGondola)
+        {
+            brakeAmount *= 3.0F;
+        }
+        if (brakeAmountPerFrame >= speed.magnitude) return Vector3.zero;
+        speed -= speed.normalized * brakeAmount;
         brake = false;
         return clampSpeed(speed);
     }

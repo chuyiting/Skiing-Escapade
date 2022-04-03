@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class GlobalStorage : MonoBehaviour
 {
-    private static Vector3 StartPointOne = new Vector3(1464.9f, 478.4f, 299f);
+    private static Vector3 StartPointOne = new Vector3(1456.29f, 478.4f, 311.02f);
     private static Vector3 StartPointTwo = new Vector3(3952f, 92f, 3225f);
     public static Vector3 StoredPlayerPosition = StartPointOne;
     public static Quaternion StoredPlayerRotation;
